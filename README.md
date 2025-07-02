@@ -46,6 +46,8 @@ Siempre que modifiques la lógica, **debes actualizar primero este documento** a
   - Cantidad de operaciones por señal (`TradesPerSignal`)
 - Panel visual simple en gráfico (versión básica)
 - Compatible con backtesting y forward-testing en MetaTrader 5
+- Trailing Stop individual por trade configurable en USD, con activación y paso fácil de entender.
+- Lógica alineada con documento técnico y panel robusto en gráfico.
 
 ---
 

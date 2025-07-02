@@ -1,3 +1,10 @@
+## [1.17] – 2025-07-02
+### Añadido
+- Trailing Stop individual por trade configurable en dólares (inputs claros: TrailStartDollars y TrailStepDollars).
+- Panel visual actualizado y explicaciones de inputs.
+- Mejora general de robustez y visualización de prints de debug.
+
+
 # Changelog – R&B Quantum Yield Bot
 
 ## [1.12] – 2025-07-02
