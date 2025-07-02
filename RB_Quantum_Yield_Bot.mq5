@@ -6,6 +6,8 @@
 #property version   "1.1"
 #property strict
 
+#include <Trade\Trade.mqh>
+
 //--- Inputs
 input int    FastEMAPeriod        = 50;         // EMA Rápida (periodos)
 input int    SlowEMAPeriod        = 200;        // EMA Lenta (periodos)
@@ -33,19 +35,42 @@ input int    MaxCandleRangePoints = 500;        // Vela máx (pts)
 input int    PanelFontSize        = 14;         // Tamaño fuente panel
 
 //--- Global variables
-static datetime lastBarTime       = 0;
 double onePoint;
 double tickValue;
-int    symmetricalTFs[6] = { PERIOD_M1, PERIOD_M5, PERIOD_M15, PERIOD_H1, PERIOD_H4, PERIOD_D1 };
+int handlesFast[6];
+int handlesSlow[6];
+ENUM_TIMEFRAMES tfs[6] = {PERIOD_M1, PERIOD_M5, PERIOD_M15, PERIOD_H1, PERIOD_H4, PERIOD_D1};
+CTrade trade;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   onePoint   = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-   tickValue  = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+   onePoint  = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+   // Create EMA handles for each TF
+   for(int i=0; i<6; i++)
+     {
+      handlesFast[i] = iMA(_Symbol, tfs[i], FastEMAPeriod, 0, MODE_EMA, PRICE_CLOSE);
+      if(handlesFast[i]==INVALID_HANDLE) return(INIT_FAILED);
+      handlesSlow[i] = iMA(_Symbol, tfs[i], SlowEMAPeriod, 0, MODE_EMA, PRICE_CLOSE);
+      if(handlesSlow[i]==INVALID_HANDLE) return(INIT_FAILED);
+     }
    return(INIT_SUCCEEDED);
+  }
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+   // Release EMA handles
+   for(int i=0; i<6; i++)
+     {
+      if(handlesFast[i]!=INVALID_HANDLE)  IndicatorRelease(handlesFast[i]);
+      if(handlesSlow[i]!=INVALID_HANDLE)  IndicatorRelease(handlesSlow[i]);
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -53,86 +78,83 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnTick()
   {
-   // Detect new bar
-   datetime currentBarTime = iTime(_Symbol, _Period, 0);
-   if(currentBarTime == lastBarTime) return;
-   lastBarTime = currentBarTime;
+   static datetime lastTime=0;
+   datetime t = iTime(_Symbol, _Period, 0);
+   if(t==lastTime) return; // wait new bar
+   lastTime = t;
 
-   // Filters: spread & slippage
-   if(SymbolInfoInteger(_Symbol, SYMBOL_SPREAD) > MaxSpreadPoints) return;
+   // Filter by spread
+   if((int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD) > MaxSpreadPoints) return;
 
    int trend = GetTrendState();
-   if(trend == 0) return; // no clear trend
+   if(trend==0) return;
 
-   // Confirm candle
    if(!ConfirmCandle(trend)) return;
 
-   // Allow countertrend?
-   if(!AllowCounterTrend && HasOppositeOrder(trend)) return;
+   if(!AllowCounterTrend && HasOppositePosition(trend)) return;
 
-   // Execute orders
-   ExecuteOrders(trend);
+   ExecuteOrder(trend);
 
-   // Apply trailing stop
    if(UseTrail) ApplyTrailing();
   }
 
 //+------------------------------------------------------------------+
-//| Compute trend state:  1=up, -1=down, 0=neutral                  |
+//| Get global trend state                                           |
 //+------------------------------------------------------------------+
 int GetTrendState()
   {
-   int alignedUp = 0, alignedDown = 0;
-   bool weightUp = false, weightDown = false;
+   int up=0, down=0;
+   bool weightUp=false, weightDown=false;
+   double fastBuf[1], slowBuf[1];
    for(int i=0; i<6; i++)
      {
-      ENUM_TIMEFRAMES tf = (ENUM_TIMEFRAMES)symmetricalTFs[i];
-      double emaF = iMA(_Symbol, tf, FastEMAPeriod, 0, MODE_EMA, PRICE_CLOSE, 1);
-      double emaS = iMA(_Symbol, tf, SlowEMAPeriod, 0, MODE_EMA, PRICE_CLOSE, 1);
-      if(emaF > emaS)
+      if(CopyBuffer(handlesFast[i], 0, 1, 1, fastBuf)<=0) continue;
+      if(CopyBuffer(handlesSlow[i], 0, 1, 1, slowBuf)<=0) continue;
+      if(fastBuf[0] > slowBuf[0])
         {
-         alignedUp++;
-         if(tf == WeightTF) weightUp = true;
+         up++;
+         if(tfs[i]==WeightTF) weightUp=true;
         }
-      else if(emaF < emaS)
+      else if(fastBuf[0] < slowBuf[0])
         {
-         alignedDown++;
-         if(tf == WeightTF) weightDown = true;
+         down++;
+         if(tfs[i]==WeightTF) weightDown=true;
         }
      }
-   if(alignedUp >= MinFramesAligned && weightUp) return(1);
-   if(alignedDown >= MinFramesAligned && weightDown) return(-1);
+   if(up>=MinFramesAligned && weightUp) return(1);
+   if(down>=MinFramesAligned && weightDown) return(-1);
    return(0);
   }
 
 //+------------------------------------------------------------------+
-//| Confirm the previous candle in ExecTF matches trend             |
+//| Confirm candle in ExecTF                                         |
 //+------------------------------------------------------------------+
 bool ConfirmCandle(int trend)
   {
    double openC  = iOpen(_Symbol, ExecTF, 1);
    double closeC = iClose(_Symbol, ExecTF, 1);
-   int    range  = (int)(MathAbs(closeC - openC) / onePoint);
-   if(range > MaxCandleRangePoints) return(false);
+   int rangePts = (int)MathAbs((closeC-openC)/onePoint);
+   if(rangePts > MaxCandleRangePoints) return(false);
    if(trend==1 && closeC>openC) return(true);
    if(trend==-1 && closeC<openC) return(true);
    return(false);
   }
 
 //+------------------------------------------------------------------+
-//| Check opposite orders                                           |
+//| Check opposite existing position                                 |
 //+------------------------------------------------------------------+
-bool HasOppositeOrder(int trend)
+bool HasOppositePosition(int trend)
   {
-   for(int i=0; i<OrdersTotal(); i++)
+   for(int i=0; i<PositionsTotal(); i++)
      {
-      if(OrderSelect(i, SELECT_BY_POS))
+      if(PositionSelectByIndex(i))
         {
-         if(OrderSymbol()==_Symbol)
+         if(PositionGetString(POSITION_SYMBOL)==_Symbol)
            {
-            if((trend==1 && OrderType()==ORDER_TYPE_SELL) ||
-               (trend==-1 && OrderType()==ORDER_TYPE_BUY))
-               return(true);
+            int type = (int)PositionGetInteger(POSITION_TYPE);
+            if((trend==1 && type==POSITION_TYPE_SELL) ||
+               (trend==-1 && type==POSITION_TYPE_BUY))
+               return true;
            }
         }
      }
@@ -140,53 +162,46 @@ bool HasOppositeOrder(int trend)
   }
 
 //+------------------------------------------------------------------+
-//| Execute entry orders                                            |
+//| Execute one order                                                |
 //+------------------------------------------------------------------+
-void ExecuteOrders(int trend)
+void ExecuteOrder(int trend)
   {
-   double price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   if(trend==1) price = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-
-   // SL/TP in points
-   double slPoints=0, tpPoints=0;
+   double lot = 0.1;
+   double price = (trend==1 ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID));
+   double slPts, tpPts;
    if(RiskMode==MONEY)
      {
-      slPoints = SL_Money / tickValue;
-      tpPoints = TP_Money / tickValue;
+      slPts = SL_Money  / tickValue;
+      tpPts = TP_Money  / tickValue;
      }
    else
      {
       double bal = AccountInfoDouble(ACCOUNT_BALANCE);
-      slPoints = (SL_Pct/100.0 * bal) / tickValue;
-      tpPoints = (TP_Pct/100.0 * bal) / tickValue;
+      slPts = (SL_Pct/100.0 * bal) / tickValue;
+      tpPts = (TP_Pct/100.0 * bal) / tickValue;
      }
-
-   double sl = (trend==1) ? price - slPoints*onePoint : price + slPoints*onePoint;
-   double tp = (trend==1) ? price + tpPoints*onePoint : price - tpPoints*onePoint;
-
-   int slippage = MaxSlippagePoints;
-   int ticket = OrderSend(_Symbol, trend==1?OP_BUY:OP_SELL, 
-                          0.1, price, slippage, sl, tp, 
-                          "QB Trade", 0, 0, clrNONE);
+   double sl = (trend==1 ? price - slPts*onePoint : price + slPts*onePoint);
+   double tp = (trend==1 ? price + tpPts*onePoint : price - tpPts*onePoint);
+   if(trend==1)
+      trade.Buy(lot, _Symbol, price, sl, tp, NULL);
+   else
+      trade.Sell(lot, _Symbol, price, sl, tp, NULL);
   }
 
 //+------------------------------------------------------------------+
-//| Apply global trailing stop                                      |
+//| Apply global trailing stop                                       |
 //+------------------------------------------------------------------+
 void ApplyTrailing()
   {
-   double totalProfit = 0;
-   double stopLevel;
-   for(int i=0; i<OrdersTotal(); i++)
+   double totalProfit=0;
+   for(int i=0; i<PositionsTotal(); i++)
      {
-      if(OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
-        {
-         if(OrderSymbol()==_Symbol)
-            totalProfit += OrderProfit();
-        }
+      if(PositionSelectByIndex(i) && PositionGetString(POSITION_SYMBOL)==_Symbol)
+         totalProfit += PositionGetDouble(POSITION_PROFIT);
      }
    if(totalProfit < StartTrailMoney) return;
-   stopLevel = (StartTrailMoney - TrailStepMoney) * onePoint;
-   // TODO: implement grouping ALL vs LONG_SHORT
-   // Move stops accordingly...
+   // TODO: implement TrailGroupMode LONG_SHORT; ALL currently
+   double newStop = (StartTrailMoney - TrailStepMoney);
+   // For ALL: move stops to breakeven + offsets if needed
+   // Implementation left for next version
   }
