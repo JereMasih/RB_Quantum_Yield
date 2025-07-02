@@ -1,0 +1,106 @@
+DOCUMENTO TÉCNICO – R&B - Quantum Yield Bot
+
+Versión: 1.12 • Fecha: 2025-07-02
+Autoría conjunta: Jere Masih & ChatGPT
+
+--------------------------------------------------
+1 · Propósito y alcance
+
+Este documento es la fuente única de verdad (SSOT) para la lógica, parámetros y arquitectura del Expert Advisor «R&B - Quantum Yield Bot». Cualquier cambio funcional debe reflejarse aquí antes (o en paralelo) a la modificación de código.
+
+--------------------------------------------------
+2 · Arquitectura general
+
+- Archivo único: RB_Quantum_Yield_Bot.mq5
+- Lenguaje: MQL5
+- Organización de bloques:
+  1. Trend Detection
+  2. Candle Confirmation & Entry
+  3. Risk Manager (SL/TP)
+  4. Trailing Stop Global
+  5. Order Execution
+  6. Panel Visual
+  7. Utility & Init
+
+--------------------------------------------------
+3 · Inputs del usuario
+
+| Variable           | Tipo / Rango     | Descripción                             | Defecto |
+|--------------------|------------------|-----------------------------------------|---------|
+| FastEMAPeriod      | int ≥1           | Período de la EMA rápida                | 50      |
+| SlowEMAPeriod      | int ≥1           | Período de la EMA lenta                 | 200     |
+| MinFramesAligned   | 2‑6              | Nº mínimo de TF alineados (incluye Peso)| 3       |
+| WeightTF           | ENUM_TF          | Marco de peso de la tendencia           | H1      |
+| ExecTF             | ENUM_TF          | Marco donde se confirma la vela         | M15     |
+| RiskMode           | MONEY / PERCENT  | Selección de modo de riesgo             | MONEY   |
+| SL_Money           | double ≥0        | SL fijo en USD (RiskMode=MONEY)         | 100     |
+| TP_Money           | double ≥0        | TP fijo en USD (RiskMode=MONEY)         | 150     |
+| SL_Pct             | 0‑100            | SL % balance (RiskMode=PERCENT)         | 1.0     |
+| TP_Pct             | 0‑100            | TP % balance (RiskMode=PERCENT)         | 1.5     |
+| UseTrail           | bool             | Activar trailing global                 | true    |
+| StartTrailMoney    | double ≥0        | Ganancia flotante que activa trailing    | 1000    |
+| TrailStepMoney     | double ≥1        | Paso de avance del trailing             | 500     |
+| TrailGroupMode     | ALL/LONG_SHORT   | ALL = todas las pos.; LONG_SHORT = trailing separado Buy/Sell | ALL  |
+| AllowCounterTrend  | bool             | Permite abrir trades opuestos sin cerrar| false   |
+| MaxSpreadPoints    | int ≥0           | Spread máximo permitido (pts)           | 30      |
+| MaxSlippagePoints  | int ≥0           | Slippage máximo (pts)                   | 5       |
+| MaxCandleRangePoints| int ≥0          | Rango máximo de la vela previa (pts)    | 500     |
+| PanelFontSize      | int ≥10          | Tamaño base del texto del panel         | 14      |
+| TradeLotSize       | double ≥0.01     | Tamaño de lote por operación            | 0.1     |
+| TradesPerSignal    | int ≥1           | Nº de operaciones por señal             | 1       |
+
+--------------------------------------------------
+4 · Lógica funcional
+
+4.1 Detección de tendencia multitemporal
+- EMA rápida y lenta en M1, M5, M15, H1, H4, D1.
+- Estado por TF: 1 (alcista), -1 (bajista), 0 (neutral)
+- Requiere MinFramesAligned TF alineados (incluye WeightTF).
+
+4.2 Confirmación de vela
+- Se evalúa la vela cerrada (index 1) del ExecTF.
+- Alcista: Close>Open. Bajista: Close<Open.
+
+4.3 Gestión de riesgo
+- Modo MONEY: SL/TP en USD (convertidos a puntos).
+- Modo PERCENT: SL/TP en % balance (convertido a puntos).
+
+4.4 Ejecución de órdenes
+- Por cada señal válida se abrirán TradesPerSignal operaciones, cada una de TradeLotSize lotes.
+
+4.5 Trailing Stop Global
+- Activa cuando la ganancia flotante ≥ StartTrailMoney.
+- Nivel inicial: StartTrailMoney – TrailStepMoney.
+- Cada paso adicional mueve el nivel +TrailStepMoney.
+
+4.6 AllowCounterTrend
+- false: evita señales contrarias si ya hay posiciones abiertas.
+- true: permite abrir nuevas en sentido contrario, sin cerrar previas.
+
+4.7 Filtros de entrada
+- Rechaza si Spread, Slippage o rango de vela supera los máximos definidos.
+
+4.8 Panel visual
+- Muestra: nombre EA, tendencia, WeightTF, tamaño de lote, trades/Señal.
+- Tamaño de fuente configurable.
+
+--------------------------------------------------
+5 · Gestión de versiones
+
+- Encabezado del código: // R&B - Quantum Yield Bot | vX.XX | YYYY-MM-DD
+- Cada cambio → actualizar este documento y CHANGELOG.md.
+
+--------------------------------------------------
+6 · Roadmap corto
+
+1.12 – Añadidos inputs de lote y cantidad de trades por señal, y panel visual básico.
+
+--------------------------------------------------
+7 · Autorización de cambios
+
+Solo se aceptan pull-requests que presenten:
+1. Actualización de este documento.
+2. Cambio correspondiente en código + CHANGELOG.
+
+--------------------------------------------------
+© 2025 Jere Masih | ChatGPT
