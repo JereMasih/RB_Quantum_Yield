@@ -1,121 +1,68 @@
-# R&B Quantum Yield – Expert Advisor para MetaTrader 5
+# R&B - Quantum Yield Bot
 
-> **Repositorio oficial – Última actualización: 26/06/2025**
-
----
-
-## 🟢 Estado actual del desarrollo
-
-- **Robot funcional y modular:**  
-  El sistema opera en modo backtest y real sin errores de compilación ni advertencias. Arquitectura lista para agregar y ajustar bloques fácilmente.
-- **Repositorio limpio y versionado:**  
-  Solo se mantienen en la raíz los archivos activos; versiones anteriores se archivan en `/docs/versiones anteriores/`.
-- **Documentación y pruebas en progreso:**  
-  Los módulos, inputs y salidas están documentados para facilitar la continuidad, debug y colaboración.
+Bienvenido al repositorio oficial de **R&B - Quantum Yield Bot**, el Expert Advisor profesional para MetaTrader 5 desarrollado por Jere Masih & ChatGPT.
 
 ---
 
-## 🎯 Objetivo técnico del proyecto
+## Descripción
 
-Desarrollar un **Expert Advisor profesional para MetaTrader 5** capaz de:
+Este robot ejecuta una estrategia de **seguimiento de tendencia multitemporal** utilizando cruces de medias móviles exponenciales, confirmación de velas y un sistema de gestión de riesgo avanzado.
 
-1. **Detectar la tendencia dominante multitemporal** usando cruces de EMAs en 6 timeframes (M1, M5, M15, H1, H4, D1), requiriendo mínimo 3 marcos alineados y que el "marco de peso" elegido esté incluido.
-2. **Confirmar y ejecutar operaciones** solo ante cierre de vela a favor de la tendencia, con opción de permitir o no entradas contrarias según configuración.
-3. **Gestionar TP/SL** por porcentaje de balance o monto fijo, a elección del usuario.
-4. **Ofrecer un panel visual (HUD)** en el gráfico con información clave: dirección de la tendencia, marco de peso, cantidad de coincidencias, balance y equity.
-5. **Permitir integración y registro en Notion** para documentación, logs y bitácora educativa.
+> **Este repositorio implementa la Fase 2 del proyecto:**  
+> Archivo único `.mq5`, documentación profesional, y toda la lógica consolidada y testeada.
 
 ---
 
-## 📁 Estructura del repo y archivos principales
-/GitHub REPO
-├── RBQY_Test_B3.mq5                      # EA principal (poné este en Experts)
-├── TrendDetectionBlock_v1.6.mqh          # Bloque 1: Detección multitemporal
-├── EntryBlock_Modernov1.4.mqh            # Bloque 2: Confirmación y entradas
-├── Trade.mqh, Object.mqh, …            # Archivos estándar de MQL5
-├── /docs/
-│    └── versiones anteriores/            # MQ5/MQH de etapas previas, para rollback
+## Estructura del repositorio
 
-- **Ubicación recomendada:**  
-  - *.mq5* en `MQL5/Experts/`
-  - *.mqh* en `MQL5/Include/RBQY/`
-  - `/docs` solo para almacenamiento y consulta, no afecta el build.
+RB_Quantum_Yield/
+├── RB_Quantum_Yield_Bot.mq5 # EA principal (versión única)
+├── CHANGELOG.md
+├── README.md
+├── documentos/ # Documento Técnico (última versión en .txt)
+├── documentos_previos/ # Documentación histórica y versiones antiguas
+├── tests/ # Sets y reportes de backtest
+├── versiones_anteriores/ # Código viejo, pruebas, archivos desactualizados
+
 
 ---
 
-## 🧩 Descripción técnica de los bloques
+## Documento Técnico
 
-### Bloque 1 – Detección de Tendencia Multitemporal
+La **fuente única de verdad (SSOT)** para la lógica y parámetros está en:  
+`documentos/Documento_Tecnico_RB_Quantum_Yield_Bot.txt`
 
-- Evalúa cruces EMA rápida/lenta en 6 timeframes.
-- Parámetros clave:
-  - `WeightTF`: timeframe "de peso" (obligatorio en coincidencia)
-  - `FastPeriod`, `SlowPeriod`: periodos de EMAs
-  - Todos configurables como *input*
-- Lógica:
-  - Suma coincidencias alcistas/bajistas, verifica si el marco de peso coincide.
-  - Devuelve `TrendDir = 1` (alcista), `-1` (bajista) o `0` (sin señal).
-- **Incluye HUD/Panel:**  
-  - Visualización con `Comment()`: tendencia, marco de peso, balance, equity.
-- **Archivo:**  
-  - `TrendDetectionBlock_v1.6.mqh`
+Siempre que modifiques la lógica, **debes actualizar primero este documento** antes de cambiar el código.
 
 ---
 
-### Bloque 2 – Confirmación de Vela y Ejecución de Entradas
+## Principales características
 
-- Confirma entrada solo al cierre de vela a favor de la tendencia.
-- Inputs principales:
-  - `AllowCounterTrend`: permite o no señales opuestas
-  - `NumOrders`, `LotSize`: cantidad y tamaño de órdenes
-  - `SLTP_Mode`, `TP_Value`, `SL_Value`: gestión dinámica TP/SL (% o monto fijo)
-- Seguridad:
-  - No abre posiciones si existen abiertas en contra.
-  - Llama a la función de cálculo de puntos según el modo de gestión.
-- **Archivo:**  
-  - `EntryBlock_Modernov1.4.mqh`
+- Estrategia multitemporal de cruce de EMAs (M1, M5, M15, H1, H4, D1)
+- Confirmación de entrada por cierre de vela
+- Gestión de riesgo avanzada: SL/TP global e individual, trailing, filtros operativos
+- **Inputs configurables:**
+  - Tamaño de lote por operación (`TradeLotSize`)
+  - Cantidad de operaciones por señal (`TradesPerSignal`)
+- Panel visual simple en gráfico (versión básica)
+- Compatible con backtesting y forward-testing en MetaTrader 5
 
 ---
 
-### EA principal – Integración y gestión
+## Flujo de trabajo recomendado
 
-- Llama a ambos bloques y orquesta el flujo del robot.
-- Estructura: `OnInit()`, `OnDeinit()`, `OnTick()`
-- Sin lógica duplicada, solo llamadas limpias.
-
----
-
-## 🚦 Gestión y buenas prácticas
-
-- Solo los archivos activos van en la raíz.
-- Cada versión funcional se archiva en `/docs/versiones anteriores/` antes de cada cambio mayor.
-- Cambios y mejoras deben versionarse con mensajes de commit claros.
-- Pruebas visuales y logs deben analizarse antes de cambios en la lógica base.
-- El HUD puede expandirse a objetos gráficos o paneles según necesidad futura.
-
----
-“Las especificaciones funcionales residen en documentos/Documento_Tecnico_RB_Quantum_Yield_Bot.md”.
----
-
-## 📌 Próximos pasos y roadmap
-
-- Validar con más backtesting los casos límite y escenarios de error.
-- Incorporar filtros adicionales (spread, horario, volatilidad) si la estrategia lo requiere.
-- Mejorar panel visual y agregar reportes automáticos.
-- Automatizar la integración de logs y bitácora educativa en Notion.
-- Estandarizar la plantilla para futuros robots y releases.
+1. Actualizar **Documento Técnico** (`documentos/Documento_Tecnico_RB_Quantum_Yield_Bot.txt`)
+2. Modificar el código en `RB_Quantum_Yield_Bot.mq5`
+3. Ejecutar pruebas en la carpeta `/tests/`
+4. Actualizar `CHANGELOG.md`
+5. Commit y push en rama `main`
 
 ---
 
-## 📞 Contacto y colaboración
+## Créditos
 
-- Autor: Jeremías Abdelmasih
-- Mail: jeremias.masih@gmail.com
-- Repo: [https://github.com/JereMasih/RB_Quantum_Yield](https://github.com/JereMasih/RB_Quantum_Yield)
+Desarrollado por **Jere Masih** junto a **ChatGPT**  
+© 2025
 
 ---
 
-> **Este README es tu hoja de ruta técnica.**
-> Si recuperás archivos viejos o hacés cambios, documentá la razón y subí la versión anterior a `/docs/versiones anteriores/`.
-
-**Actualizado por Jere & ChatGPT — 26/06/2025**
