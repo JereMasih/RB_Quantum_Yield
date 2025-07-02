@@ -94,6 +94,8 @@ Desarrollar un **Expert Advisor profesional para MetaTrader 5** capaz de:
 - El HUD puede expandirse a objetos gráficos o paneles según necesidad futura.
 
 ---
+“Las especificaciones funcionales residen en documentos/Documento_Tecnico_RB_Quantum_Yield_Bot.md”.
+---
 
 ## 📌 Próximos pasos y roadmap
 
