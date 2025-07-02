@@ -1,19 +1,17 @@
-
 //+------------------------------------------------------------------+
-//| R&B - Quantum Yield Bot | v1.1 | 2025-07-02                      |
+//| R&B - Quantum Yield Bot | v1.11 | 2025-07-02                     |
 //+------------------------------------------------------------------+
 #property copyright "© 2025 Jere Masih"
-#property version   "1.1"
+#property version   "1.11"
 #property strict
 
 #include <Trade\Trade.mqh>
-#include <PositionInfo.mqh>
 
 //--- Inputs
 input int    FastEMAPeriod        = 50;         // EMA Rápida (periodos)
 input int    SlowEMAPeriod        = 200;        // EMA Lenta (periodos)
 input int    MinFramesAligned     = 3;          // Mín.TF alineados (2-6)
-input ENUM_TIMEFRAMES WeightTF    = PERIOD_H1; // Marco de Peso
+input ENUM_TIMEFRAMES WeightTF    = PERIOD_H1;  // Marco de Peso
 input ENUM_TIMEFRAMES ExecTF      = PERIOD_M15; // Marco de Ejecución
 
 enum RiskType {MONEY, PERCENT};
@@ -66,7 +64,6 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-   // Release EMA handles
    for(int i=0; i<6; i++)
      {
       if(handlesFast[i]!=INVALID_HANDLE)  IndicatorRelease(handlesFast[i]);
@@ -84,7 +81,6 @@ void OnTick()
    if(t==lastTime) return; // wait new bar
    lastTime = t;
 
-   // Filter by spread
    if((int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD) > MaxSpreadPoints) return;
 
    int trend = GetTrendState();
@@ -106,17 +102,18 @@ int GetTrendState()
   {
    int up=0, down=0;
    bool weightUp=false, weightDown=false;
-   double fastBuf[1], slowBuf[1];
+   double fastBuf[2], slowBuf[2];
    for(int i=0; i<6; i++)
      {
-      if(CopyBuffer(handlesFast[i], 0, 1, fastBuf)<=0) continue;
-      if(CopyBuffer(handlesSlow[i], 0, 1, slowBuf)<=0) continue;
-      if(fastBuf[0] > slowBuf[0])
+      if(CopyBuffer(handlesFast[i], 0, 1, 2, fastBuf)!=2) continue;
+      if(CopyBuffer(handlesSlow[i], 0, 1, 2, slowBuf)!=2) continue;
+      // index 1: vela anterior cerrada
+      if(fastBuf[1] > slowBuf[1])
         {
          up++;
          if(tfs[i]==WeightTF) weightUp=true;
         }
-      else if(fastBuf[0] < slowBuf[0])
+      else if(fastBuf[1] < slowBuf[1])
         {
          down++;
          if(tfs[i]==WeightTF) weightDown=true;
@@ -148,11 +145,13 @@ bool HasOppositePosition(int trend)
   {
    for(int i=0; i<PositionsTotal(); i++)
      {
-      if(PositionSelectByIndex(i))
+      ulong ticket = PositionGetTicket(i);
+      if(PositionSelectByTicket(ticket))
         {
-         if(PositionGetString(POSITION_SYMBOL)==_Symbol)
+         string sym = PositionGetString(POSITION_SYMBOL);
+         int type = (int)PositionGetInteger(POSITION_TYPE);
+         if(sym==_Symbol)
            {
-            int type = (int)PositionGetInteger(POSITION_TYPE);
             if((trend==1 && type==POSITION_TYPE_SELL) ||
                (trend==-1 && type==POSITION_TYPE_BUY))
                return true;
@@ -183,4 +182,30 @@ void ExecuteOrder(int trend)
      }
    double sl = (trend==1 ? price - slPts*onePoint : price + slPts*onePoint);
    double tp = (trend==1 ? price + tpPts*onePoint : price - tpPts*onePoint);
-<|...|>
+   if(trend==1)
+      trade.Buy(lot, _Symbol, price, sl, tp, NULL);
+   else
+      trade.Sell(lot, _Symbol, price, sl, tp, NULL);
+  }
+
+//+------------------------------------------------------------------+
+//| Apply global trailing stop                                       |
+//+------------------------------------------------------------------+
+void ApplyTrailing()
+  {
+   double totalProfit=0;
+   for(int i=0; i<PositionsTotal(); i++)
+     {
+      ulong ticket = PositionGetTicket(i);
+      if(PositionSelectByTicket(ticket))
+        {
+         string sym = PositionGetString(POSITION_SYMBOL);
+         if(sym==_Symbol)
+            totalProfit += PositionGetDouble(POSITION_PROFIT);
+        }
+     }
+   if(totalProfit < StartTrailMoney) return;
+   // TODO: implementar TrailGroupMode LONG_SHORT; por ahora solo ALL
+   // Lógica de trailing pendiente de implementación final.
+  }
+//+------------------------------------------------------------------+
