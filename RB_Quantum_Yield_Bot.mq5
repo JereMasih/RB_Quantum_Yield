@@ -7,6 +7,7 @@
 #property strict
 
 #include <Trade\Trade.mqh>
+#include <PositionInfo.mqh>
 
 //--- Inputs
 input int    FastEMAPeriod        = 50;         // EMA Rápida (periodos)
@@ -108,8 +109,8 @@ int GetTrendState()
    double fastBuf[1], slowBuf[1];
    for(int i=0; i<6; i++)
      {
-      if(CopyBuffer(handlesFast[i], 0, 1, 1, fastBuf)<=0) continue;
-      if(CopyBuffer(handlesSlow[i], 0, 1, 1, slowBuf)<=0) continue;
+      if(CopyBuffer(handlesFast[i], 0, 1, fastBuf)<=0) continue;
+      if(CopyBuffer(handlesSlow[i], 0, 1, slowBuf)<=0) continue;
       if(fastBuf[0] > slowBuf[0])
         {
          up++;
@@ -182,26 +183,4 @@ void ExecuteOrder(int trend)
      }
    double sl = (trend==1 ? price - slPts*onePoint : price + slPts*onePoint);
    double tp = (trend==1 ? price + tpPts*onePoint : price - tpPts*onePoint);
-   if(trend==1)
-      trade.Buy(lot, _Symbol, price, sl, tp, NULL);
-   else
-      trade.Sell(lot, _Symbol, price, sl, tp, NULL);
-  }
-
-//+------------------------------------------------------------------+
-//| Apply global trailing stop                                       |
-//+------------------------------------------------------------------+
-void ApplyTrailing()
-  {
-   double totalProfit=0;
-   for(int i=0; i<PositionsTotal(); i++)
-     {
-      if(PositionSelectByIndex(i) && PositionGetString(POSITION_SYMBOL)==_Symbol)
-         totalProfit += PositionGetDouble(POSITION_PROFIT);
-     }
-   if(totalProfit < StartTrailMoney) return;
-   // TODO: implement TrailGroupMode LONG_SHORT; ALL currently
-   double newStop = (StartTrailMoney - TrailStepMoney);
-   // For ALL: move stops to breakeven + offsets if needed
-   // Implementation left for next version
-  }
+<|...|>
