@@ -1,8 +1,8 @@
 //+------------------------------------------------------------------+
-//| R&B - Quantum Yield Bot | v1.11 | 2025-07-02                     |
+//| R&B - Quantum Yield Bot | v1.12 | 2025-07-02                     |
 //+------------------------------------------------------------------+
 #property copyright "© 2025 Jere Masih"
-#property version   "1.11"
+#property version   "1.12"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -33,6 +33,9 @@ input int    MaxSlippagePoints    = 5;          // Slippage máx (pts)
 input int    MaxCandleRangePoints = 500;        // Vela máx (pts)
 input int    PanelFontSize        = 14;         // Tamaño fuente panel
 
+input double TradeLotSize         = 0.1;        // Tamaño de lote por operación
+input int    TradesPerSignal      = 1;          // Cuántas operaciones abrir por señal
+
 //--- Global variables
 double onePoint;
 double tickValue;
@@ -48,7 +51,6 @@ int OnInit()
   {
    onePoint  = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
    tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
-   // Create EMA handles for each TF
    for(int i=0; i<6; i++)
      {
       handlesFast[i] = iMA(_Symbol, tfs[i], FastEMAPeriod, 0, MODE_EMA, PRICE_CLOSE);
@@ -59,9 +61,6 @@ int OnInit()
    return(INIT_SUCCEEDED);
   }
 
-//+------------------------------------------------------------------+
-//| Expert deinitialization function                                 |
-//+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
    for(int i=0; i<6; i++)
@@ -71,33 +70,31 @@ void OnDeinit(const int reason)
      }
   }
 
-//+------------------------------------------------------------------+
-//| Expert tick function                                             |
-//+------------------------------------------------------------------+
 void OnTick()
   {
    static datetime lastTime=0;
    datetime t = iTime(_Symbol, _Period, 0);
-   if(t==lastTime) return; // wait new bar
+   if(t==lastTime) return;
    lastTime = t;
 
    if((int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD) > MaxSpreadPoints) return;
 
    int trend = GetTrendState();
    if(trend==0) return;
-
    if(!ConfirmCandle(trend)) return;
-
    if(!AllowCounterTrend && HasOppositePosition(trend)) return;
-
    ExecuteOrder(trend);
-
    if(UseTrail) ApplyTrailing();
+
+   // --- Panel visual simple (provisorio) ---
+   string info = "RB Quantum Yield v1.12\n";
+   info += "Trend: " + ((trend==1) ? "ALCISTA" : (trend==-1 ? "BAJISTA" : "NEUTRAL")) + "\n";
+   info += "Weight TF: " + EnumToString(WeightTF) + "\n";
+   info += "Lot size: " + DoubleToString(TradeLotSize,2) + "\n";
+   info += "Trades/Signal: " + IntegerToString(TradesPerSignal);
+   Comment(info);
   }
 
-//+------------------------------------------------------------------+
-//| Get global trend state                                           |
-//+------------------------------------------------------------------+
 int GetTrendState()
   {
    int up=0, down=0;
@@ -107,7 +104,6 @@ int GetTrendState()
      {
       if(CopyBuffer(handlesFast[i], 0, 1, 2, fastBuf)!=2) continue;
       if(CopyBuffer(handlesSlow[i], 0, 1, 2, slowBuf)!=2) continue;
-      // index 1: vela anterior cerrada
       if(fastBuf[1] > slowBuf[1])
         {
          up++;
@@ -124,9 +120,6 @@ int GetTrendState()
    return(0);
   }
 
-//+------------------------------------------------------------------+
-//| Confirm candle in ExecTF                                         |
-//+------------------------------------------------------------------+
 bool ConfirmCandle(int trend)
   {
    double openC  = iOpen(_Symbol, ExecTF, 1);
@@ -138,9 +131,6 @@ bool ConfirmCandle(int trend)
    return(false);
   }
 
-//+------------------------------------------------------------------+
-//| Check opposite existing position                                 |
-//+------------------------------------------------------------------+
 bool HasOppositePosition(int trend)
   {
    for(int i=0; i<PositionsTotal(); i++)
@@ -161,12 +151,8 @@ bool HasOppositePosition(int trend)
    return(false);
   }
 
-//+------------------------------------------------------------------+
-//| Execute one order                                                |
-//+------------------------------------------------------------------+
 void ExecuteOrder(int trend)
   {
-   double lot = 0.1;
    double price = (trend==1 ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID));
    double slPts, tpPts;
    if(RiskMode==MONEY)
@@ -182,15 +168,16 @@ void ExecuteOrder(int trend)
      }
    double sl = (trend==1 ? price - slPts*onePoint : price + slPts*onePoint);
    double tp = (trend==1 ? price + tpPts*onePoint : price - tpPts*onePoint);
-   if(trend==1)
-      trade.Buy(lot, _Symbol, price, sl, tp, NULL);
-   else
-      trade.Sell(lot, _Symbol, price, sl, tp, NULL);
+
+   for(int i=0; i<TradesPerSignal; i++)
+     {
+      if(trend==1)
+         trade.Buy(TradeLotSize, _Symbol, price, sl, tp, NULL);
+      else
+         trade.Sell(TradeLotSize, _Symbol, price, sl, tp, NULL);
+     }
   }
 
-//+------------------------------------------------------------------+
-//| Apply global trailing stop                                       |
-//+------------------------------------------------------------------+
 void ApplyTrailing()
   {
    double totalProfit=0;
@@ -208,4 +195,3 @@ void ApplyTrailing()
    // TODO: implementar TrailGroupMode LONG_SHORT; por ahora solo ALL
    // Lógica de trailing pendiente de implementación final.
   }
-//+------------------------------------------------------------------+
