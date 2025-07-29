@@ -31,3 +31,9 @@
 - Se respaldó la versión local modificada en: versiones_anteriores/RB_Quantum_Yield_Bot_local_20250729_0009.mq5
 - Se restauró la versión oficial del archivo 'RB_Quantum_Yield_Bot.mq5' desde el repositorio.
 
+
+## [v1.22] feat: establece versión 1.22 como principal
+
+- Se reemplazó la versión v1.17 por la nueva v1.22.
+- La versión anterior fue respaldada como: versiones_anteriores/RB_Quantum_Yield_Bot_v1.17.mq5
+
