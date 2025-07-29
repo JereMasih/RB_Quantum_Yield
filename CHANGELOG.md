@@ -25,3 +25,9 @@
 - Migración a único archivo RB_Quantum_Yield_Bot.mq5
 - Gestión de tendencia, filtro de confirmación de vela, entradas, SL/TP, trailing básico
 - Inputs principales y estructura de repositorio profesional
+
+## [20250729_0009] fix: restaura versión pública desde GitHub y guarda copia local anterior
+
+- Se respaldó la versión local modificada en: versiones_anteriores/RB_Quantum_Yield_Bot_local_20250729_0009.mq5
+- Se restauró la versión oficial del archivo 'RB_Quantum_Yield_Bot.mq5' desde el repositorio.
+
