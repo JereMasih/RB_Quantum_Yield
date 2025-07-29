@@ -37,3 +37,9 @@
 - Se reemplazó la versión v1.17 por la nueva v1.22.
 - La versión anterior fue respaldada como: versiones_anteriores/RB_Quantum_Yield_Bot_v1.17.mq5
 
+
+## [v1.22] HUD PRO ESTABLE - versión unificada, visual y operativa
+
+- Reemplazo completo del código base por la versión 1.22 final, autocontenida.
+- HUD PRO funcional, sin includes, listo para próxima iteración.
+
